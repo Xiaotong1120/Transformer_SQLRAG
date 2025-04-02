@@ -27,7 +27,7 @@ Overall, the project demonstrates how clinicians or analysts can **query the MIM
 
 ## System Architecture and Workflow
 
-![Retrieval Augmented Generation (RAG) Sequence Diagram](model.png)
+![Retrieval Augmented Generation (RAG) Sequence Diagram](Presentation2.png)
 
 The system consists of an **offline ingestion phase** and an **online query-answering phase**:
 
