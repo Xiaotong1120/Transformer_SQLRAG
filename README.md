@@ -154,11 +154,10 @@ This approach of a "try, validate, and repair" loop makes the system more robust
 
 ### 6. Query Execution on the Database
 
-Once we have a validated SQL query, the system executes it against the PostgreSQL database (which holds the MIMIC-IV subset). We use a Python DB API (psycopg2) with a safe execution function that applies a timeout (e.g. 30 seconds) to avoid long-running queries and a row limit (e.g. 50,000 rows) to avoid overwhelming the user or the memory. The query is run in a read-only transaction.
+Once we have a validated SQL query, the system executes it against the PostgreSQL database (which holds the MIMIC-IV subset). We use a Python DB API (psycopg2) with a safe execution function that applies a timeout to avoid long-running queries and a row limit (e.g. 50,000 rows) to avoid overwhelming the user or the memory. The query is run in a read-only transaction.
 
-Thanks to the earlier steps, by the time we run it, this SQL is expected to be correct and relevant. On execution, there are a few possibilities:
+Thanks to the earlier steps, by the time we run it, in most cases this SQL is expected to be correct and relevant. On execution, there are a few possibilities:
 - For aggregate queries or selective queries, we get a result set (which could be a few rows to thousands of rows). We fetch the results into a Pandas DataFrame for ease of manipulation.
-- If the query was something like just creating a temporary table or had no output (which in our use case shouldn't happen, since we focus on SELECT queries for answering questions), we handle that separately, but typically we always do a SELECT to answer the user's question.
 - If any database error occurs at this stage (e.g. a rare case where the query is syntactically correct but fails for some reason, or network issues connecting to DB), we catch it and return an error message to the user. This is an extra safety net, though our prior validation makes it unlikely for execution to fail.
 
 ### 7. Results Summarization in Natural Language
