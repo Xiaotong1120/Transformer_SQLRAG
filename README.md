@@ -53,11 +53,9 @@ When a question comes in (e.g. "Which diagnoses are most common among elderly pa
 
 The choice of OpenAI's embedding model is due to its strong performance and efficiency – text-embedding-3-small significantly outperforms the older ada-002 model on retrieval tasks (44% vs 31% on a multilingual info retrieval benchmark) while being 5× cheaper.
 
-With the query vector in hand, we perform a cosine similarity search against the stored table embeddings to find which tables are most related to the question. This is implemented using the pgVector extension in PostgreSQL, which allows storing embeddings and performing similarity queries directly in SQL. (In our code, we simply fetch all table embeddings and compute cosine similarity in Python for simplicity, but this could be done with a ORDER BY embedding <-> query_vector LIMIT k SQL query as well.) The top K tables by similarity score are returned as the relevant schema context.
+With the query vector in hand, we perform a cosine similarity search against the stored table embeddings to find which tables are most related to the question. This is implemented using the pgVector extension in PostgreSQL, which allows storing embeddings and performing similarity queries directly in SQL. The top K tables by similarity score are returned as the relevant schema context.
 
-For example, if the question mentioned "diagnoses" and "patients older than X", the retrieval might return the patients table and the diagnoses_icd table metadata as the most relevant. Each retrieved table comes with its stored metadata (description, columns, keys, etc.).
-
-By using embeddings, we capture semantic matches – the user's phrasing doesn't have to exactly match table names. For instance, someone asking about "medications given to patients" would semantically match the emar (electronic medication administration record) table even if they didn't use the word "emar", because the metadata for emar includes terms like "medication" and "administration". This vector-based retrieval is far more robust than simple keyword mapping, which might miss relevant tables if synonyms or implicit concepts are used.
+For example, if the question mentioned "diagnoses" and "patients older than X", the retrieval might return the patients table and the diagnoses_icd table metadata as the most relevant. Each retrieved table comes with its stored metadata.
 
 ### 2. Relevance Filtering and Query Classification
 
