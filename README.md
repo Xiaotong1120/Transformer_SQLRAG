@@ -172,19 +172,13 @@ We prepare a prompt for GPT-4 that includes:
   - If the result set is large (more than a certain number of rows, say >10), we don't feed everything (to avoid hitting token limits). Instead, we might provide the number of rows and perhaps the first few rows as a sample, plus some summary statistics if applicable (like mean, min, max for numeric columns). For example, "Results contain 500 rows. Here is a sample of 5 rows: ... And here are some summary stats: ...".
   - If the result set is small (just a few rows or a single row), we can include it entirely in a tabular text form.
 
-Then we instruct GPT-4 to "Provide a comprehensive answer to the user's question based on these results. Explain in plain language and highlight key insights or patterns. If appropriate, mention any follow-up questions or analyses." We set the role to a helpful explainer.
+Then we instruct GPT-4 to "Provide a comprehensive answer to the user's question based on these results. Explain in plain language and highlight key insights or patterns. If appropriate, mention any follow-up questions or analyses." We set the role to a helpful explainer. GPT-4 then generates a paragraph or two that answers the question.
 
-GPT-4 then generates a paragraph or two that answers the question. For example, if the question was "Which diagnoses are most common among elderly patients?", GPT-4 might say:
+This final answer is what the user sees as the main output. We also display the generated SQL and optionally the raw data table, but the focus is on the natural language explanation, since the goal is to make the data accessible.
 
-"Patients above 80 years old were most frequently diagnosed with Hypertension, followed by Chronic Kidney Disease and Diabetes Mellitus. In fact, Hypertension was present in 45% of these patients. Chronic Kidney Disease was the second most common, affecting about 30%. Diabetes was third at 25%. These conditions are common age-related illnesses, which explains their high prevalence in the elderly population. Other diagnoses in the top 10 included coronary artery disease and pneumonia. This suggests that cardiovascular and respiratory conditions are prominent in the elderly demographic. Further analysis could look at outcomes for these patients or the distribution by gender."
+By using GPT-4 to explain the results, we ensure the answer is not just a number or table but contextualized with medical insight. GPT-4's language capabilities shine here, as it can mention clinical relevance.
 
-(This is a hypothetical answer, but illustrates how the model turns the raw counts into an explanatory narrative.)
-
-This final answer is what the user sees as the main output. We also display the generated SQL and optionally the raw data table (for transparency, via collapsible sections in the Streamlit app), but the focus is on the natural language explanation, since the goal is to make the data accessible.
-
-By using GPT-4 to explain the results, we ensure the answer is not just a number or table but contextualized with medical insight. GPT-4's language capabilities shine here, as it can mention clinical relevance (as in the hypothetical example, noting conditions are age-related).
-
-Of course, we must caution that GPT-4 is not a doctor – it provides a summary, but users should interpret the results in proper clinical context. The model might sometimes over-generalize or see patterns that are obvious from data but require careful interpretation (we rely on the user, likely a researcher, to critically assess the answer).
+Of course, we must caution that GPT-4 is not a doctor – it provides a summary, but users should interpret the results in proper clinical context. The model might sometimes over-generalize or see patterns that are obvious from data but require careful interpretation.
 
 In summary, the online workflow goes through embedding → retrieval → GPT-4 (SQL) → validation → execution → GPT-4 (summary). The entire pipeline is orchestrated by the sqlrag_pipeline() function in our code, which glues these components together and handles errors at each step to return a final response dictionary.
 
