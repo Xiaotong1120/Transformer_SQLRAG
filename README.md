@@ -85,7 +85,7 @@ This classification step is important for ethical considerations. If GPT-4 deter
 If the query is classified as answerable, we move on to preparing the prompt for SQL generation. We take the metadata of the retrieved tables and format it into a schema summary that will be given to GPT-4. This formatted metadata includes:
 
 - **Table name and description**: A brief explanation of what each table contains.
-- **Table purpose**: (if provided) the intended use or key info of the table.
+- **Table purpose**: the intended use or key info of the table.
 - **Columns**: Every column name, its data type, and a short description or meaning. We might also include known value ranges or example values (e.g. for categorical codes).
 - **Primary keys and Foreign keys**: So the model knows how tables relate (e.g. diagnoses_icd has foreign keys linking to patients via subject_id and to a dictionary table for code meanings).
 - **Important considerations**: Any caveats (e.g. certain columns might be sparsely populated or only apply to certain patient types).
