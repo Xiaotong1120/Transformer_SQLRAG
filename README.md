@@ -51,7 +51,7 @@ When a user poses a question through the interface, the system goes through a se
 
 ### 1. Query Embedding & Table Retrieval
 
-When a question comes in (e.g. "Which diagnoses are most common among elderly patients?"), the first step is to vectorize the user's query. We use OpenAI's latest text embedding model (the "text-embedding-3-small" model, 1536 dimensions) to convert the question into an embedding vector. This numeric representation captures the semantic meaning of the question, allowing us to compare it with the embeddings of table metadata.
+When a question comes in (e.g. "Which diagnoses are most common among elderly patients?"), the first step is to vectorize the user's query. We use OpenAI's text embedding model (the "text-embedding-3-small" model, 1536 dimensions) to convert the question into an embedding vector. This numeric representation captures the semantic meaning of the question, allowing us to compare it with the embeddings of table metadata.
 
 The choice of OpenAI's embedding model is due to its strong performance and efficiency – text-embedding-3-small significantly outperforms the older ada-002 model on retrieval tasks (44% vs 31% on a multilingual info retrieval benchmark) while being 5× cheaper.
 
