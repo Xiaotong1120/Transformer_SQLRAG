@@ -27,8 +27,6 @@ Overall, the project demonstrates how clinicians or analysts can **query the MIM
 
 ## System Architecture and Workflow
 
-![Retrieval Augmented Generation (RAG) Sequence Diagram](Presentation2.png)
-
 The system consists of an **offline ingestion phase** and an **online query-answering phase**:
 
 ### Offline (Preprocessing/Ingestion)
@@ -48,6 +46,8 @@ When a user poses a question through the interface, the system goes through a se
 5. **SQL Validation & Fixing**: Check that the generated SQL references valid tables/columns; if it's incorrect, GPT-4 tries to fix it.
 6. **Execute the Query**: Run the validated SQL against the MIMIC-IV database in Postgres.
 7. **Summarize Results**: GPT-4 is then prompted again to produce a user-friendly explanation of the results.
+
+![Retrieval Augmented Generation (RAG) Sequence Diagram](Presentation2.png)
 
 ### 1. Query Embedding & Table Retrieval
 
