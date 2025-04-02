@@ -61,7 +61,7 @@ For example, if the question mentioned "diagnoses" and "patients older than X", 
 
 After retrieval, the system examines the results to ensure they make sense before proceeding:
 
-**Similarity Threshold Check**: We look at the highest similarity score among the retrieved tables. If the best match is below a certain threshold (configured as SIMILARITY_THRESHOLD, e.g. 0.2), it indicates the user's question might not actually pertain to any data we have. In that case, the pipeline will return a friendly message like "I don't have the necessary data to answer that question." rather than attempting a nonsensical query. This prevents the system from going off-track when faced with an unrelated query.
+**Similarity Threshold Check**: We look at the highest similarity score among the retrieved tables. If the best match is below a certain threshold, it indicates the user's question might not actually pertain to any data we have. In that case, the pipeline will return a friendly message like "I don't have the necessary data to answer that question." rather than attempting a nonsensical query. This prevents the system from going off-track when faced with an unrelated query.
 
 **Query Classification**: We then perform a classification of the user's query to determine if it's answerable with our data and whether it's appropriate to proceed. This uses GPT-4 in a zero-shot manner. We provide GPT-4 with a summary of the available tables (the names and descriptions of the top retrieved tables) and ask it to classify the question into categories such as:
 - "answerable"
