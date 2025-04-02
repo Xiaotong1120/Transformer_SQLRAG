@@ -455,3 +455,12 @@ We could augment the system to not just use the structured database but also tex
 We should continuously gather cases where the system fails or gives a wrong answer, and refine accordingly. For example, if we find an instance where GPT-4 generates a logically wrong SQL (that passes validation but yields an incorrect result for the question), we'd want to catch that. One could incorporate unit tests for a set of known queries and verify the answers. Ensuring correctness in all edge cases is challenging because of the open-ended nature of NL questions, but a suite of test queries can be developed (e.g., compare results of GPT-generated SQL to manually written SQL for the same question on a sample of questions where ground truth is known).
 
 In summary, there are many directions to extend the project – from increasing its scope (more data, more types of questions) to improving its internals (more advanced LLM usage, caching, etc.). The current system demonstrates the viability of the approach on a real clinical dataset, and future work can build on this to make it more powerful and reliable.
+
+
+## Project Overview and Motivation
+MIMIC Documentation: https://mimic.mit.edu/docs/
+MIMIC Dataset: https://physionet.org/content/mimiciv/2.2/ 
+  Johnson, A., Bulgarelli, L., Pollard, T., Horng, S., Celi, L. A., & Mark, R. (2023). MIMIC-IV (version 2.2). PhysioNet. https://doi.org/10.13026/6mm1-ek67.
+  Goldberger, A., Amaral, L., Glass, L., Hausdorff, J., Ivanov, P. C., Mark, R., ... & Stanley, H. E. (2000). PhysioBank, PhysioToolkit, and PhysioNet: Components of a new research resource for complex physiologic signals. Circulation [Online]. 101 (23), pp. e215–e220.
+  Johnson, A.E.W., Bulgarelli, L., Shen, L. et al. MIMIC-IV, a freely accessible electronic health record dataset. Sci Data 10, 1 (2023). https://doi.org/10.1038/s41597-022-01899-x
+OpenAI. (2023). ChatGPT (Mar 14 version) [Large language model]. https://chat.openai.com/chat
