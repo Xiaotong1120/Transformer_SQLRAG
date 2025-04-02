@@ -274,3 +274,189 @@ Additionally, while GPT-4 is very advanced, it is not infallible:
 Performance-wise, querying a large table like labevents can be slow. We have added an index and use appropriate filters in SQL, but some complex queries could approach the timeout. This is a technical limitation; in a production scenario, further optimizations or summarizing heavy tables in advance might be needed. Our pipeline warns or truncates results beyond a certain size to handle the volume.
 
 In summary, ethical use of this system means using it for legitimate research or exploratory analysis, not attempting to identify individuals or feed it questions that it's not designed to answer. And any insights drawn should be validated and not taken as medical advice (the system is not a doctor or a clinical decision support tool; it's an analysis aid on a historical dataset).
+
+## Setup and Installation
+
+To get this project up and running, follow these steps:
+
+### Prerequisites
+You need Docker (for the database), Python 3.x, and an OpenAI API key. Ensure you have access to the MIMIC-IV v2.2 dataset (hosp module) CSV files – due to licensing, you must obtain these from PhysioNet by completing the credentialing process. Place the CSV files in a directory (e.g., data/hosp/) on your machine.
+
+### Clone the Repository
+Download or clone the project repository to your local machine. The repository contains the code, a docker-compose.yaml for the database, and Jupyter notebooks for data loading.
+
+### Start the PostgreSQL Database
+We provide a Docker Compose configuration to run Postgres with the pgVector extension. From the project directory, run:
+
+```bash
+docker-compose up -d db
+```
+
+This will pull a Docker image with pgVector (ankane/pgvector:latest) and start a Postgres container listening on port 5433 (as configured in docker-compose.yaml). The default credentials (in config.py) are user myuser, password mypassword, database mydatabase – these can be changed in the config or .env if needed. The compose file also sets up a persistent volume for the database data.
+
+**Verify**: Once the container is up, you can connect (e.g., using psql or a DB GUI) to ensure Postgres is running. The pgVector extension is installed by the startup script in our notebooks (it runs CREATE EXTENSION vector;).
+
+### Create and Populate Database Tables
+Next, we need to create the tables for the MIMIC-IV subset and load the CSV data into them. We provide a Jupyter notebook data_storage.ipynb that contains Python code to create each table and copy data from the CSVs. Open this notebook (you can use Jupyter or VSCode or any IDE that runs .ipynb) and run through the cells. It will:
+
+1. Create tables (patients, admissions, d_icd_diagnoses, diagnoses_icd, etc.) with appropriate schema (as per MIMIC-IV).
+2. Batch insert data from each corresponding CSV. This may take some time, especially for large tables (for example, labevents.csv has over 100 million rows; the notebook reads it in chunks of 50k).
+3. Print status messages. Check that each table reports a non-zero count of rows after insertion (e.g., "Total rows in 'patients': 299712", etc., matching expected counts from MIMIC documentation).
+
+**Note**: Loading the entire MIMIC-IV hosp data can be resource-intensive (especially labevents). If you are running on limited resources or just want a quick demo, you could modify the notebook to load only a sample (e.g., limit to first 10000 rows of each CSV) to speed up the process. Otherwise, ensure you have enough disk space and time for the full load.
+
+### Create the Metadata Table and Generate Embeddings
+Once the data tables are in place, open the metatable.ipynb notebook. This notebook constructs the mimic_table_metadata table that is central to our RAG approach:
+
+1. It defines the schema for the metadata table (table name, description, columns_info JSON, etc., plus an embedding vector field).
+2. It gathers schema information: The notebook includes helper functions to pull column names and types from the database, and placeholders where you could manually insert descriptions. We have pre-filled some descriptions and common joins based on the official MIMIC-IV documentation for each table.
+3. It then uses the OpenAI embedding API to encode each table's textual metadata into a 1536-dim vector. The embedding is stored in the table (either as a VECTOR type if pgVector is enabled, or as a JSON array of floats as a fallback).
+
+Make sure to set your OpenAI API key before running this. You can put it in a .env file (the code calls load_dotenv() to pick up environment variables). For example, create a .env file in the project root with a line:
+
+```bash
+OPENAI_API_KEY=sk-YourOpenAIKeyHere
+```
+
+Running update_table_embeddings() in the notebook will iterate through each table's metadata and call the embedding API. This requires internet access and will consume tokens for each table description (cost should be low since number of tables is limited, but be mindful).
+
+After this, the mimic_table_metadata table will be filled with one row per table and an embedding. You can query this table in psql to ensure embeddings are not NULL for each entry.
+
+### Configure API Keys and Parameters
+In config.py, you can adjust settings if needed:
+- The database connection params (if you changed the Docker or want a different port).
+- The OpenAI API key is fetched from env – ensure it's set.
+- SQL_TIMEOUT, MAX_RESULTS_ROWS can be tuned (we set 30s timeout and max 50k rows to return).
+- Similarity threshold and top_k (by default we might take top 3-5 tables for context).
+
+### Install Python Dependencies
+The project uses Python libraries: psycopg2 for DB, pandas and numpy for data handling, openai for API calls, streamlit for the UI, and python-dotenv for loading env vars. Install these via pip:
+
+```bash
+pip install psycopg2-binary pandas numpy openai streamlit python-dotenv
+```
+
+(Alternatively, if a requirements.txt is provided, use pip install -r requirements.txt.)
+
+### Run the Streamlit Application
+Now everything is set. Launch the Streamlit app by running:
+
+```bash
+streamlit run app.py
+```
+
+This will start the web interface and open a browser tab (usually at http://localhost:8501). You'll see the title "Natural Language Query System for Medical Database" and a text box.
+
+### Ask a Question
+In the text area, type a medical question. For example: "How many admissions in this database were for sepsis, and what was the average age of those patients?" Then click Submit Query. The app will display a spinner while the pipeline runs (you can watch the server logs for step-by-step prints). After a few moments, you should see:
+
+- **Answer**: A paragraph in plain English answering the question (e.g., "There were 5,300 admissions with a sepsis diagnosis. The average age of patients in these admissions was 63 years...").
+- **Generated SQL Query**: (in an expandable section) The SQL that was produced and executed to get that answer. You can inspect it to verify it makes sense or to reuse it for direct database work.
+- **Raw Query Results**: (in another expandable section) The actual data returned (usually a small table or few rows) that the answer was based on.
+
+If something went wrong (e.g., no relevant tables found or a classification that it can't answer), you'll see an error message or warning instead, explaining the issue.
+
+Try a variety of questions! For example:
+- "What were the top 3 diagnoses among patients who died in the hospital?" (This would involve filtering diagnoses_icd by admissions where hospital_expire_flag = 1 in the admissions table, then counting frequencies, etc.)
+- "How many unique patients received a blood transfusion?" (Involves finding relevant events for transfusion – maybe looking at emar for transfusion meds or labevents for related lab tests.)
+- "Average length of stay for patients with a diagnosis of diabetes vs without?" (Would require computing two groups – the pipeline can do such comparisons if it identifies it needs to join diagnoses with admissions and use a CASE or two queries. GPT-4 is capable of multi-step SQL like using subqueries or CTEs.)
+- "Trend of the number of admissions per year from 2008 to 2019." (Since admission date is available, it could generate a GROUP BY year query. Our current prompt focuses on a single query answer, not a chart, but the result could be a table of counts by year which GPT-4 might then summarize as an increasing/decreasing trend narrative.)
+
+Each query will be processed fresh – currently we don't have a conversation memory (each Streamlit submission is independent). You can refine and resubmit questions based on answers (e.g., if you see an interesting result, you might ask a follow-up that references it, but note our system doesn't carry state from one question to the next).
+
+### Shut Down
+When done, you can stop the Streamlit server (Ctrl+C in console) and bring down the Docker Postgres container with:
+
+```bash
+docker-compose down
+```
+
+The database volume is persisted, so the data remains if you restart later.
+
+## Design Rationale and Discussion
+
+Throughout the development of this project, we made certain design decisions to balance capability, safety, and complexity:
+
+### Why use a vector similarity approach for table retrieval?
+The alternative would be a rule-based mapping from keywords to tables (for example, if query contains "diagnosis" then use diagnoses_icd). However, rule-based approaches are brittle – users might phrase concepts in many ways. Our embedding approach allows semantic matching: it can match "heart attack" with a table that has "myocardial infarction" in its description, for instance. It also naturally scales to multi-table queries; if a question mentions elements related to two tables, those two should surface to the top. Using embeddings for schema elements is inspired by how RAG is used for unstructured text, just applied to structured schema instead. This makes the system more flexible and robust to novel queries. We augmented the table metadata with synonyms and example questions (where available) to enrich the embedding – this means the vector for a table "knows" not just its schema but also what kind of questions it can answer. This significantly improves retrieval quality.
+
+### Why pgVector in Postgres instead of a dedicated vector DB?
+As mentioned, keeping everything in Postgres simplifies the architecture. We already need Postgres for the actual data; adding vector capability to it avoids standing up an extra service and syncing data. Postgres with pgVector is quite performant for moderate scale and supports both exact and approximate search with indexing. Since our use case (number of tables ~ maybe a few dozen) is small, performance is a non-issue – cosine similarity on a few dozen vectors is instantaneous even without an index. But if we had hundreds or thousands of tables or documents, pgVector's indexes (IVFFlat or HNSW indexes) could be used to speed up similarity search dramatically. Another benefit is that using Postgres allows complex filtering in vector queries if needed (e.g., "find relevant tables among those in a certain category" could be done with a WHERE clause alongside the embedding similarity). In short, pgVector gave us everything needed with minimal overhead.
+
+### Why GPT-4 (and not GPT-3.5 or a smaller model)?
+We did experiment with GPT-3.5 for SQL generation. While it works for simpler queries, it struggled with more complex ones, especially those requiring multiple joins or understanding less common columns. GPT-4, on the other hand, has demonstrated a much better understanding of the nuanced instructions we provided. It adheres to the instruction of outputting only SQL more reliably, and it was more likely to include the necessary joins for code descriptions (where GPT-3.5 might ignore instruction #7 about joining descriptor tables, for example). Given that we are focusing on quality over cost (this is not meant to handle thousands of queries per hour; it's likely a handful of complex queries by a researcher), GPT-4 was the clear choice. Additionally, for summarization, GPT-4's coherent and contextually aware writing is an asset – it can connect the results to clinical context appropriately, whereas GPT-3.5 sometimes gave overly generic or less nuanced summaries.
+
+### Prompt Design
+We put significant thought into how we prompt GPT-4:
+
+1. We use a system message to set the role, e.g. "You are a medical database expert…" to anchor it in the correct persona.
+2. The user prompt for SQL generation is structured with sections and bullet points. This structure likely helps the model internally organize how to tackle the problem (almost like a checklist). We explicitly mention things like foreign keys and edge cases to reduce the chance of logical errors in the query. The instruction to return only the query is to avoid parsing problems. (In testing, if we didn't specify this, the model might explain the query or apologize for limitations in ways that mix with the SQL, making extraction hard.)
+3. The prompt for SQL fixing is also very pointed: by giving the exact columns present, we essentially eliminate ambiguity for the model, turning the problem into mostly a pattern-matching correction task. This is usually sufficient for small mistakes.
+4. The classification prompt asks for a JSON output with specific fields. We chose JSON to make it machine-readable without ambiguity. GPT-4 is fairly good at following this output format request. We then parse it with Python's json library. This approach allows easy extension of new classes if we wanted, and it keeps the logic of "allowed or not" outside of the model (the model just provides reasoning and a label, we enforce how to handle it).
+5. The summarization prompt includes the SQL and results mainly to ground the model. One might worry about token usage, but GPT-4's context window is large enough for our typical result sizes. We also trim the data or use stats to keep it concise. The model is asked to be comprehensive yet clear – this is somewhat open-ended, but we found GPT-4 generally produces a nice answer that we can directly show to the user.
+
+In all cases, we aimed to minimize hallucination by providing as much relevant info as possible (schema, actual results) and by not asking the model to do anything beyond that scope. We are not, for example, asking GPT-4 to give medical advice or interpret significance; it's summarizing what's in the data. This controlled use of the LLM adheres to best practices noted in literature, where grounding an LLM with relevant context is key to reliability.
+
+### Safety Checks vs. Flexibility
+We included safety checks (classification, similarity threshold) to avoid obviously problematic outputs. One might ask, does this hinder the system's usefulness? In our view, it's a necessary balance. The vast majority of interesting analytical questions will pass the checks. Only questions that the system truly cannot or should not answer are stopped. This is better than the system either attempting something invalid (and confusing the user) or producing an answer that violates ethical guidelines. For instance, without classification, a question like "What's the name of the oldest patient?" – the system might attempt a query (even though names aren't in the data, it might return an empty or irrelevant result, or misinterpret it as wanting patient ID). With classification, we catch that this is a malformed question for our context.
+
+### Modularity and Extensibility
+The project's structure was chosen to make it easy to extend:
+- New embedding model? Just change the model name in vectorize_user_query and re-embed the metadata.
+- More tables or data source? Just add them to the metadata table and the system will consider them in retrieval. The pipeline doesn't hardcode any table names.
+- Different LLM (say local GPT-4 or another provider)? As long as you can call it similarly, you can swap out the openai API calls in llm.py.
+
+We can also extend the prompt templates easily. For example, if we wanted to add a rule like "Prefer limiting to first 100 rows if the output is huge," we can add another bullet in the prompt and the model will likely follow. This is simpler than changing a rule-based SQL generator.
+
+Potential future improvement: we could incorporate multi-turn dialog allowing the user to ask follow-ups that refine or build on previous queries. This would require keeping track of conversation state and perhaps caching previous results or at least previous context. Our current design (stateless per question) is simpler but a conversational interface could be layered on top by maintaining a history and feeding that as part of the prompt (with GPT-4's long context, that's feasible).
+
+Another extension could be to integrate a visualization library so that if the result is time-series or distribution data, the system could optionally plot a chart. Streamlit could display matplotlib or Altair charts. While this is beyond the core scope, it's a user-friendly enhancement for certain query types ("trend of admissions per year" could show a line chart, for example). The SQL generation prompt could be adjusted to hint the model to aggregate by year for such a question, and then we detect that pattern and draw a chart from the DataFrame.
+
+### Why not use direct natural language to SQL without retrieval?
+One might wonder if GPT-4 could just be prompted with "Here is the database schema (all tables) … now answer queries." This is somewhat feasible, but as the schema grows, that prompt becomes very large and less precise. By retrieving only relevant tables, we keep the prompt focused and short. This also mirrors the idea of least needed context – supply the model only with what it likely needs. If we gave the entire schema every time, we waste tokens and risk confusion with unrelated tables. Also, by having a separate metadata store, we were able to enrich the schema information with additional notes and examples, which a straightforward schema listing wouldn't include. This undoubtedly helps the model understand usage. Our approach is in line with recent research emphasizing that retrieval-augmented methods improve text-to-SQL accuracy by providing only the most pertinent schema info.
+
+### Handling of Large Results
+We had to address how to handle potentially large query outputs. We decided on a cut-off (50k rows) and summarization rather than showing everything. This is a practical design choice – if a user really needs the raw data, they likely wouldn't be using a natural language interface. Our system's goal is insight, not data dump. By providing summary statistics and a snippet, we give a flavor of the data. If needed, an advanced user could take the SQL and run it separately on the full database to get all rows.
+
+In essence, the design decisions were driven by making the system effective (able to answer real, complex questions correctly) and safe (avoiding misuse or confusion). We leveraged established tools (Postgres, embeddings, GPT-4) and glued them in a novel way tailored to the MIMIC-IV use case. The result is a pipeline that can answer a wide range of epidemiological and clinical queries on the data, echoing what recent studies have found: RAG can unlock a lot of value in EHR databases with the power of LLMs.
+
+## Possible Extensions and Future Work
+
+This project is a solid foundation, but there are many ways it could be extended or improved:
+
+### Expand to Full MIMIC-IV and Other Modules
+Currently we focused on the hospital (general admissions) module. MIMIC-IV also has an ICU module (detailed intensive care unit data) and an ED module (emergency department). We could integrate those by adding their tables to the database and metadata. Our pipeline would then be able to answer ICU-specific questions (e.g. ventilator settings, vital signs trends) by retrieving those tables. This would increase the scope of questions answerable. The vector retrieval approach would help isolate whether a question is about ICU stays or general wards.
+
+### Temporal or Sequential Questions
+Some questions might require multiple queries or more reasoning than a single SQL. For instance: "Among patients who had surgery, what percentage were readmitted within 30 days?" This might require one query to identify surgeries and another to check readmissions, or a self-join. GPT-4 can sometimes handle this in one nested query, but more complex multi-step analyses might exceed a single prompt's reliable capacity. A possible extension is a multi-turn agent approach: use an LLM planner to break a complex query into sub-queries, run them, then combine results. LangChain or similar frameworks could facilitate this. However, that adds complexity. Another approach is to feed the LLM some scratchpad memory (like allow it to propose intermediate results which we execute and return). This verges into the idea of an LLM "agent" that can iteratively query a database. Our current pipeline is single-shot; extending it to multi-step reasoning could greatly enhance its ability to answer complex questions (at the cost of more prompt engineering and API calls).
+
+### Fine-tuning or Custom Modeling
+We relied on out-of-the-box GPT-4. If one had access to fine-tune an LLM or had a large set of question-SQL pairs (like the dataset mentioned in the related literature), one could attempt to fine-tune a model for this task to reduce reliance on instructions. However, GPT-4 cannot be fine-tuned as of now (OpenAI only allows fine-tuning for smaller models). Fine-tuning a smaller open model might not yield the same performance. So this is a research direction – currently, prompt engineering with GPT-4 was the pragmatic choice.
+
+### Use of Function Calling or Tool APIs
+OpenAI's newer API features (function calling) allow the model to directly return a structured format (like an AST or a SQL string without any hallucinated text) in a guaranteed way. We could define a "function" schema for a SQL query and let GPT-4 fill it out. This might reduce the need for our regex cleaning. Similarly, OpenAI plugins or tools could let the model run the SQL itself and iterate. However, for our scenario, the custom pipeline gave us more control. It would be interesting to experiment with an agent that has a "SQL execution" tool – essentially the model would decide itself when to run a query and get results, maybe refining the query based on results. This is cutting-edge but could make the system even more autonomous. For now, we prefer the deterministic pipeline approach for transparency and safety.
+
+### UI Improvements
+The Streamlit UI is basic. We could enhance it with:
+- A selection of example questions the user can click (to help new users understand what to ask).
+- Better formatting of answers (maybe highlighting key numbers).
+- If the question result is naturally a figure (like a trend over time), automatically plotting it.
+- A sidebar showing the retrieved tables and their similarity scores (for those curious about what the system thought was relevant).
+- Logging of queries and performance metrics for monitoring usage.
+
+### Performance and Scaling
+For very large data or very frequent queries, one might need to optimize:
+- Caching embeddings so if the same question (or a very similar one) is asked, we reuse results.
+- Caching SQL results for recently asked questions.
+- Pre-computing some common query answers (though that defeats the purpose of NL interface, since user can ask anything).
+- Sharding the database or using cloud-hosted solutions for bigger data.
+
+Our pipeline currently processes one query at a time in sequence (each Streamlit request). We'd need to add concurrency handling if we expected multiple users or automated querying. This could involve running the pipeline asynchronously or on a serverless function per request.
+
+### Additional Data Sources
+We could augment the system to not just use the structured database but also textual notes or medical literature. For example, if a question needs clinical definitions (not data counts), an extended RAG could retrieve from a medical knowledge base or the MIMIC-IV clinical notes (if available and embedded). That would effectively hybridize the system into both a data query engine and a document question-answering engine. However, combining these would require careful orchestration (knowing when to query data vs when to fetch text). It's an ambitious idea beyond the current scope.
+
+### Better Error Analysis
+We should continuously gather cases where the system fails or gives a wrong answer, and refine accordingly. For example, if we find an instance where GPT-4 generates a logically wrong SQL (that passes validation but yields an incorrect result for the question), we'd want to catch that. One could incorporate unit tests for a set of known queries and verify the answers. Ensuring correctness in all edge cases is challenging because of the open-ended nature of NL questions, but a suite of test queries can be developed (e.g., compare results of GPT-generated SQL to manually written SQL for the same question on a sample of questions where ground truth is known).
+
+In summary, there are many directions to extend the project – from increasing its scope (more data, more types of questions) to improving its internals (more advanced LLM usage, caching, etc.). The current system demonstrates the viability of the approach on a real clinical dataset, and future work can build on this to make it more powerful and reliable.
