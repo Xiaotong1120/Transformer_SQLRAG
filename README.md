@@ -35,6 +35,8 @@ The system consists of an **offline ingestion phase** and an **online query-answ
 
 We curate a metadata table containing documentation for each table in the MIMIC-IV subset. This includes the table's description, purpose, column info (with data types and meanings), primary/foreign keys, common join relationships, example questions, and synonyms. Each table's metadata is then encoded into a vector embedding using OpenAI's embedding model, and stored in Postgres (using the `VECTOR` data type from pgVector). This forms our *vector index* of knowledge. Essentially, we index the schema documentation so the system can semantically search which tables might be relevant to a new question.
 
+![Retrieval Augmented Generation (RAG) Sequence Diagram](UML.png)
+
 ### Online (Query Workflow)
 
 When a user poses a question through the interface, the system goes through a sequence of stages to produce the answer. At a high level:
@@ -79,8 +81,6 @@ This is essentially a safety and relevance check:
 This classification step is important for ethical considerations. If GPT-4 determines the question is not answerable or not appropriate, the pipeline stops and returns an explanatory message to the user (e.g. "I'm sorry, I cannot answer that because it asks for personal patient information."). This ensures we do not produce SQL for disallowed queries. In practice, most general analytical questions will be "answerable" and the pipeline will continue.
 
 ### 3. Prompt Construction with Retrieved Metadata
-
-![Retrieval Augmented Generation (RAG) Sequence Diagram](UML.png)
 
 If the query is classified as answerable, we move on to preparing the prompt for SQL generation. We take the metadata of the retrieved tables and format it into a schema summary that will be given to GPT-4. This formatted metadata includes:
 
