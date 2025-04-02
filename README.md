@@ -130,7 +130,7 @@ GROUP BY d.long_title
 ORDER BY patient_count DESC;
 ```
 
-This step relies on GPT-4's ability to understand the question and the provided schema context to form a valid query. GPT-4 was chosen because of its superior capability in understanding complex instructions and generating syntactically correct and semantically appropriate SQL. Simpler models (like GPT-3.5) were less reliable for this domain, often misunderstanding the schema or missing join conditions. Research in 2024 has shown that integrating retrieval context (as we do) helps LLMs generate much better SQL for EHR data, and we observed GPT-4's outputs to be quite good in initial testing.
+This step relies on GPT-4's ability to understand the question and the provided schema context to form a valid query. GPT-4 was chosen because of its superior capability in understanding complex instructions and generating syntactically correct and semantically appropriate SQL. Simpler models (like GPT-3.5) were less reliable for this domain, often misunderstanding the schema or missing join conditions. 
 
 ### 5. SQL Validation and Automatic Correction
 
