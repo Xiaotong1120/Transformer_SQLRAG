@@ -15,7 +15,6 @@
 - [Setup and Installation](#setup-and-installation)
 - [Design Rationale and Discussion](#design-rationale-and-discussion)
 - [Possible Extensions and Future Work](#possible-extensions-and-future-work)
-- [Project Structure](#project-structure)
 
 ## Project Overview and Motivation
 
