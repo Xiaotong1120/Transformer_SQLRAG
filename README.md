@@ -33,9 +33,9 @@ The system consists of an **offline ingestion phase** and an **online query-answ
 
 ### Offline (Preprocessing/Ingestion)
 
-We curate a metadata table containing documentation for each table in the MIMIC-IV subset. This includes the table's description, purpose, column info (with data types and meanings), primary/foreign keys, common join relationships, example questions, and synonyms. Each table's metadata is then encoded into a vector embedding using OpenAI's embedding model, and stored in Postgres (using the `VECTOR` data type from pgVector). This forms our *vector index* of knowledge. Essentially, we index the schema documentation so the system can semantically search which tables might be relevant to a new question.
-
 ![Retrieval Augmented Generation (RAG) Sequence Diagram](UML.png)
+
+We curate a metadata table containing documentation for each table in the MIMIC-IV subset. This includes the table's description, purpose, column info (with data types and meanings), primary/foreign keys, common join relationships, example questions, and synonyms. Each table's metadata is then encoded into a vector embedding using OpenAI's embedding model, and stored in Postgres (using the `VECTOR` data type from pgVector). This forms our *vector index* of knowledge. Essentially, we index the schema documentation so the system can semantically search which tables might be relevant to a new question.
 
 ### Online (Query Workflow)
 
